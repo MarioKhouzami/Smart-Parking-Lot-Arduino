@@ -1,0 +1,98 @@
+#include <Servo.h>
+Servo myservo;
+int def = 6;
+int pos = 0;
+int cmIn = 0;
+int cmOut = 0;
+bool servoShouldMove = true;
+int servoMoved = 0;
+long readUltrasonicDistance(int triggerPin, int echoPin) {
+  pinMode(triggerPin, OUTPUT);
+  digitalWrite(triggerPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(triggerPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(triggerPin, LOW);
+  pinMode(echoPin, INPUT);
+  return pulseIn(echoPin, HIGH);
+}
+byte seven_seg_digits[11][7] = {
+  { 1, 1, 1, 1, 1, 1, 0 },  // = 0
+  { 0, 1, 1, 0, 0, 0, 0 },  // = 1
+  { 1, 1, 0, 1, 1, 0, 1 },  // = 2
+  { 1, 1, 1, 1, 0, 0, 1 },  // = 3
+  { 0, 1, 1, 0, 0, 1, 1 },  // = 4
+  { 1, 0, 1, 1, 0, 1, 1 },  // = 5
+  { 1, 0, 1, 1, 1, 1, 1 },  // = 6
+  { 1, 1, 1, 0, 0, 0, 0 },  // = 7
+  { 1, 1, 1, 1, 1, 1, 1 },  // = 8
+  { 1, 1, 1, 0, 0, 1, 1 }   // = 9
+};
+
+void sevenSegWrite(byte digit) {
+  byte pin = 2;
+  for (byte segCount = 0; segCount < 7; ++segCount) {
+    digitalWrite(pin, seven_seg_digits[digit][segCount]);
+    ++pin;
+  }
+}
+
+void setup() {
+  myservo.attach(9);
+  myservo.write(0);
+  Serial.begin(9600);
+  sevenSegWrite(def);
+}
+
+void loop() {
+  cmIn = 0.01723 * readUltrasonicDistance(11, 10);
+  cmOut = 0.01723 * readUltrasonicDistance(13, 12);
+
+  if (cmIn < 20 && servoMoved == 0) {
+    Serial.print("cm IN: ");
+    Serial.println(cmIn);
+    def--;
+    sevenSegWrite(def);
+    if (def < 0) {
+      def = 0;
+      servoShouldMove = false;
+      sevenSegWrite(def);
+    }
+    for (pos = 0; pos <= 90 && servoShouldMove; pos += 1) {
+      myservo.write(pos);
+      delay(15);
+    }
+    delay(1500);
+    servoMoved++;
+  }
+  delay(500);
+  if (cmIn > 20 && servoMoved == 1) {
+    for (pos = 90; pos >= 0 && servoShouldMove; pos -= 1) {
+      myservo.write(pos);
+      delay(15);
+    }
+    delay(1500);
+    servoMoved--;
+  }
+
+  if (cmOut < 20) {
+    Serial.print("cm OUT: ");
+    Serial.println(cmOut);
+    delay(1000);
+    def++;
+    sevenSegWrite(def);
+    if (def > 6) {
+      servoShouldMove = false;
+      def = 6;
+      sevenSegWrite(def);
+    }
+    if (def >= 0 && def <= 6) {
+      servoShouldMove = true;
+    }
+    if (def < 0) {
+      def = 0;
+      sevenSegWrite(def);
+    }
+    delay(1000);
+  }
+}
